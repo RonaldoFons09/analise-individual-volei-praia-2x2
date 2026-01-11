@@ -66,18 +66,52 @@ mask_date = (df['Data'] >= pd.to_datetime(start_date)) & (df['Data'] <= pd.to_da
 filtered_df = df.loc[mask_date]
 
 # Location Filter
-locations = ['Todos'] + sorted(filtered_df['Local'].unique().tolist())
-selected_location = st.sidebar.selectbox("Local", locations)
+locations = sorted(filtered_df['Local'].unique().tolist())
+selected_location = st.sidebar.selectbox("Local", ["Todos"] + locations)
 
-if selected_location != 'Todos':
+if selected_location != "Todos":
     filtered_df = filtered_df[filtered_df['Local'] == selected_location]
 
-# Fundament Filter
-fundaments = ['Todos'] + sorted(filtered_df['Fundamentos'].unique().tolist())
-selected_fundament = st.sidebar.multiselect("Fundamentos", fundaments[1:], default=fundaments[1:])
+st.sidebar.markdown("---")
+st.sidebar.subheader("Filtrar Fundamentos")
+
+# Category Filter (New High Level Filter)
+categories = sorted(filtered_df['Categoria'].unique().tolist())
+selected_categories = st.sidebar.multiselect(
+    "1. Selecione Categorias (Opcional)",
+    categories,
+    placeholder="Todas as categorias"
+)
+
+# Filter by Category first if selected
+if selected_categories:
+    filtered_df = filtered_df[filtered_df['Categoria'].isin(selected_categories)]
+
+# Specific Fundament Filter (Dependent on Category)
+# Note: changing default to [] (empty) prevents the "Wall of Tags"
+available_fundaments = sorted(filtered_df['Fundamentos'].unique().tolist())
+selected_fundament = st.sidebar.multiselect(
+    "2. Detalhes Específicos (Opcional)", 
+    available_fundaments,
+    placeholder="Todos os tipos"
+)
 
 if selected_fundament:
     filtered_df = filtered_df[filtered_df['Fundamentos'].isin(selected_fundament)]
+
+# Custom CSS for Sidebar to look more "Modern"
+st.markdown("""
+    <style>
+        section[data-testid="stSidebar"] {
+            background-color: #1a1c24;
+        }
+        /* Custom styling for multiselect tags to be less aggressive */
+        .stMultiSelect span[data-baseweb="tag"] {
+            background-color: #262730 !important;
+            border: 1px solid #4a4d5a;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 # --- MAIN DASHBOARD ---
 
