@@ -166,63 +166,127 @@ cat_group = cat_group.sort_values('Order')
 
 # Display Metrics Cards
 cols = st.columns(len(cat_group))
+
+# Criteria Guide
+criteria_map = {
+    'Recepção': "**✅ Certa:**\nSempre na zona de levantamento, próximo à rede e bola na frente.\n\n**❌ Errada:**\nBola fora da zona de levantamento.",
+    'Ataque': "**✅ Certa:**\nPonto direto.\n\n**❌ Errada:**\nBola fora, bloqueio direto, defesa adversária.",
+    'Levantamento': "**✅ Certa:**\nAltura adequada; Ataque possível; Atacante equilibrado.\n\n**❌ Errada:**\nDois toques; Condução; Bola não permite ataque.",
+    'Saque': "**✅ Certa:**\nBola dentro da quadra adversária.\n\n**❌ Errada:**\nBola fora, bola na rede."
+}
+
 for idx, row in cat_group.iterrows():
     eff = row['Eficiencia']
     color = get_color(eff)
     status = get_status(eff)
+    cat = row['Categoria']
+    tooltip = criteria_map.get(cat, "Sem critério definido.")
     
     with cols[idx % len(cols)]:
-        st.markdown(f"""
-            <div class="metric-card" style="border-left: 5px solid {color};">
-                <h3 style="margin:0">{row['Categoria']}</h3>
-                <h2 style="margin:0; color: {color}">{eff:.1%}</h2>
-                <p style="margin:0; font-size: 0.9em; opacity: 0.8">{status}</p>
-                <p style="margin:0; font-size: 0.8em; opacity: 0.6">{int(row['Total Calculated'])}/{int(row['Quantidade correta'])} acertos</p>
-            </div>
-        """, unsafe_allow_html=True)
+        # Colored bar to maintain the visual cue
+        st.markdown(f"<div style='height: 4px; width: 100%; background-color: {color}; border-radius: 4px; margin-bottom: 8px;'></div>", unsafe_allow_html=True)
+        
+        # Native Metric with Help Tooltip (Markdown supported)
+        st.metric(
+            label=cat,
+            value=f"{eff:.1%}",
+            help=tooltip,
+            delta=None # Delta removed to keep cleaner, info moving to caption
+        )
+        # Caption for details
+        st.caption(f"**{status}** • {int(row['Total Calculated'])}/{int(row['Quantidade correta'])} acertos")
 
 st.markdown("---")
 
-# --- DETAILED ANALYSIS ---
-st.subheader("Eficiência Detalhada por Variação")
 
-# Clean Data for Chart
-# User request: Keep Attack variations detailed, but aggregate Levantamento.
-# Since "Levantamento" exists as a row, we just hide the "Levantamento - ..." specific ones
-# which are mostly error descriptions or redundancy.
+# --- MAGIC QUADRANT (TACTICAL ANALYSIS) ---
+st.subheader("Mapa de Decisão de Ataque (Quadrante Mágico)", help="""
+**Como interpretar os quadrantes:**
+\n
+💎 **SEGURANÇA** (Alta Eficiência + Alto Volume):  
+Seus golpes de confiança. Continue usando!
+\n
+🚀 **POTENCIAL** (Alta Eficiência + Baixo Volume):  
+Golpes que você acerta, mas usa pouco. **Dica Tática:** Tente usar mais vezes no jogo.
+\n
+⚠️ **RISCO/VÍCIO** (Baixa Eficiência + Alto Volume):  
+Golpes que você usa muito, mas erra muito. **Dica Tática:** Pare de insistir ou treine separado.
+\n
+🗑️ **DESCARTE** (Baixa Eficiência + Baixo Volume):  
+Golpes que não funcionam. Evite.
+""")
 
-fundament_group = filtered_df.groupby('Fundamentos').agg({
-    'Quantidade correta': 'sum',
-    'Total Calculated': 'sum'
-}).reset_index()
+# Filter for Attack Variations ONLY
+# We want specific types like "Ataque - Pinga", "Ataque - Diagonal". 
+# So we filter for strings starting with 'Ataque -'
+attack_df = filtered_df[filtered_df['Fundamentos'].str.startswith('Ataque -')]
 
-# Filter: Exclude "Levantamento -" rows. Keep "Levantamento" exact match.
-fundament_group = fundament_group[~fundament_group['Fundamentos'].str.contains('Levantamento -')]
+if attack_df.empty:
+    st.info("Sem dados de variações de ataque para o período selecionado.")
+else:
+    # Group again specifically for this chart
+    attack_group = attack_df.groupby('Fundamentos').agg({
+        'Quantidade correta': 'sum',
+        'Total Calculated': 'sum'
+    }).reset_index()
+    
+    attack_group['Eficiencia'] = attack_group['Quantidade correta'] / attack_group['Total Calculated']
 
-fundament_group['Eficiencia'] = fundament_group['Quantidade correta'] / fundament_group['Total Calculated']
-fundament_group = fundament_group.sort_values('Eficiencia', ascending=True)
+    # Determine thresholds for quadrants based on Attack data
+    avg_volume = attack_group['Total Calculated'].mean()
+    target_efficiency = 0.60 
 
-# Apply colors to chart bars based on threshold
-colors = [get_color(e) for e in fundament_group['Eficiencia']]
+    fig_scat = px.scatter(
+        attack_group,
+        x='Total Calculated',
+        y='Eficiencia',
+        text='Fundamentos',
+        size='Total Calculated', # Bubble size = Volume
+        hover_data=['Quantidade correta'],
+        color='Eficiencia',
+        color_continuous_scale='RdYlGn',
+        title=f"Volume (x) vs Eficiência (y) - Variações de Ataque"
+    )
 
-fig_bar = go.Figure()
-fig_bar.add_trace(go.Bar(
-    x=fundament_group['Eficiencia'],
-    y=fundament_group['Fundamentos'],
-    orientation='h',
-    text=fundament_group['Eficiencia'].apply(lambda x: f'{x:.1%}'),
-    textposition='auto',
-    marker_color=colors
-))
+    # Reference lines to form quadrants
+    fig_scat.add_hline(y=target_efficiency, line_dash="dash", line_color="white", annotation_text="Meta Eficiência")
+    fig_scat.add_vline(x=avg_volume, line_dash="dash", line_color="white", annotation_text="Média Volume")
 
-fig_bar.update_layout(
-    title="Eficiência por Variação Específica",
-    xaxis_tickformat='.0%', 
-    xaxis_title="Eficiência",
-    yaxis_title="",
-    height=max(400, len(fundament_group)*40) # Adjust height based on items
-)
-st.plotly_chart(fig_bar, use_container_width=True)
+    # Quadrant Labels (Fixed positions/Smart positions)
+    # Top Right: Security
+    fig_scat.add_annotation(x=attack_group['Total Calculated'].max(), y=1.0, text="💎 SEGURANÇA", showarrow=False, font=dict(color="#2ecc71", size=14))
+    # Top Left: Potential
+    fig_scat.add_annotation(x=attack_group['Total Calculated'].min(), y=1.0, text="🚀 POTENCIAL", showarrow=False, font=dict(color="#3498db", size=14))
+    # Bottom Right: Vices/Risk
+    fig_scat.add_annotation(x=attack_group['Total Calculated'].max(), y=0.0, text="⚠️ RISCO/VÍCIO", showarrow=False, font=dict(color="#e74c3c", size=14))
+    # Bottom Left: Discard
+    fig_scat.add_annotation(x=attack_group['Total Calculated'].min(), y=0.0, text="🗑️ DESCARTE", showarrow=False, font=dict(color="#7f8c8d", size=14))
+
+    # Custom Hover Template
+    fig_scat.update_traces(
+        textposition='top center',
+        hovertemplate="<b>%{text}</b><br>Eficiência: %{y:.0%}<br>Volume: %{x}<br>Acertos: %{customdata[0]}<extra></extra>"
+    )
+    fig_scat.update_layout(
+        xaxis_title="Volume de Tentativas",
+        yaxis_title="Eficiência (%)",
+        yaxis_tickformat='.0%',
+        coloraxis_colorbar=dict(
+            tickformat='.0%',
+            title="Eficiência"
+        ),
+        height=500
+    )
+
+    st.plotly_chart(
+        fig_scat, 
+        use_container_width=True,
+        config={
+            'displayModeBar': True,
+            'displaylogo': False,
+            'modeBarButtons': [['toImage']] # Only show Download Image button
+        }
+    )
 
 # Efficiency Over Time (General)
 st.subheader("Evolução da Eficiência Geral no Tempo")
@@ -240,7 +304,15 @@ fig_line_general = px.line(
     title="Evolução da Eficiência Geral Diária"
 )
 fig_line_general.update_yaxes(tickformat='.0%')
-st.plotly_chart(fig_line_general, use_container_width=True)
+st.plotly_chart(
+    fig_line_general,
+    use_container_width=True,
+    config={
+        'displayModeBar': True,
+        'displaylogo': False,
+        'modeBarButtons': [['toImage']]
+    }
+)
 
 # Efficiency Over Time (Categorized)
 st.subheader("Evolução da Eficiência no Tempo por Categoria")
@@ -272,7 +344,15 @@ fig_line = px.line(
     title="Evolução da Eficiência Diária por Fundamento"
 )
 fig_line.update_yaxes(tickformat='.0%')
-st.plotly_chart(fig_line, use_container_width=True)
+st.plotly_chart(
+    fig_line, 
+    use_container_width=True,
+    config={
+        'displayModeBar': True,
+        'displaylogo': False,
+        'modeBarButtons': [['toImage']]
+    }
+)
 
 # Table below the chart
 st.markdown("##### Tabela de Eficiência Diária")
