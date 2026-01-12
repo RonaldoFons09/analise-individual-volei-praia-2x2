@@ -1,14 +1,27 @@
 import pandas as pd
 import numpy as np
+import streamlit as st
+from streamlit_gsheets import GSheetsConnection
 
-def load_data(file_path):
+def load_data(file_path=None):
     """
-    Loads and cleans data from the Excel file.
+    Loads and cleans data from Google Sheets.
     """
     try:
-        # Load the specific sheet 'Página1' and skip the first row (header is on line 2 in 0-indexed terms)
-        # Based on inspection: Row 0 is mostly NaN, Row 1 has headers.
-        df = pd.read_excel(file_path, sheet_name='Página1', header=1)
+        # Load data using Streamlit Google Sheets Connection
+        # Uses credentials from .streamlit/secrets.toml
+        conn = st.connection("gsheets", type=GSheetsConnection)
+        
+        # Read the spreadsheet (default is first sheet, which matches 'Página1' usually)
+        # header=1 implies row 1 is header (0-indexed), similar to read_excel behavior.
+        # However, st.connection might read everything. Let's try reading as is.
+        # If the structure matches Excel, we might need to skip rows.
+        # But 'read()' usually infers headers. Let's assume standard tabular data first.
+        # Specify the worksheet 'Página1' explicitly, as the first sheet is likely documentation/criteria
+        df = conn.read(worksheet='Página1', header=1) 
+
+
+
         
         # Clean column names (strip whitespace)
         df.columns = df.columns.str.strip()
@@ -17,7 +30,8 @@ def load_data(file_path):
         df = df.dropna(subset=['Data', 'Fundamentos'])
         
         # Convert Data to datetime
-        df['Data'] = pd.to_datetime(df['Data'], errors='coerce')
+        # Enforce dayfirst=True because source is typically DD/MM/YYYY
+        df['Data'] = pd.to_datetime(df['Data'], dayfirst=True, errors='coerce')
         
         # Numeric columns to clean
         numeric_cols = ['Quantidade correta', 'Quantidade errada', 'Quantidade total']
@@ -80,5 +94,5 @@ def load_data(file_path):
         return df
         
     except Exception as e:
-        print(f"Error loading data: {e}")
+        st.error(f"Erro detalhado na conexão: {e}")
         return pd.DataFrame() # Return empty on error

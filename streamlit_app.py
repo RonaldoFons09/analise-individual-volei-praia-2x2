@@ -33,10 +33,17 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Load Data
-@st.cache_data
+# Load Data
+# ttl=60 ensures data is refreshed every 60 seconds automatically
+@st.cache_data(ttl=60)
 def get_data():
-    file_path = 'Autoavaliação vôlei de praia (1).xlsx'
-    return load_data(file_path)
+    # Load from Google Sheets (Source is handled inside load_data via secrets)
+    return load_data()
+
+# Refresh Button in Sidebar
+if st.sidebar.button("🔄 Atualizar Dados"):
+    st.cache_data.clear()
+    st.rerun()
 
 df = get_data()
 
@@ -52,14 +59,23 @@ if df.empty:
 st.sidebar.header("Filtros")
 
 # Date Filter
+# Date Filter
 min_date = df['Data'].min()
 max_date = df['Data'].max()
-start_date, end_date = st.sidebar.date_input(
+date_range = st.sidebar.date_input(
     "Período",
     [min_date, max_date],
     min_value=min_date,
     max_value=max_date
 )
+
+# Handle cases where date_input might return a single date (e.g. initial load or single selection)
+if len(date_range) == 2:
+    start_date, end_date = date_range
+else:
+    start_date = date_range[0]
+    end_date = date_range[0]
+
 
 # Filter Data by Date
 mask_date = (df['Data'] >= pd.to_datetime(start_date)) & (df['Data'] <= pd.to_datetime(end_date))
@@ -360,7 +376,7 @@ st.markdown("##### Tabela de Eficiência Diária")
 pivot_table = time_cat_group.pivot(index='Data', columns='Categoria', values='Eficiencia')
 st.dataframe(
     pivot_table.style.format('{:.1%}'),
-    use_container_width=True
+    width='stretch'
 )
 
 
@@ -376,5 +392,5 @@ with st.expander("Ver Tabela Completa"):
             'Quantidade errada': '{:.0f}',
             'Total Calculated': '{:.0f}'
         }),
-        use_container_width=True
+        width='stretch'
     )
