@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from dashboard_data import carregar_dados_processados
+from dashboard_data import carregar_dados_processados, COL_TIPO
 # Importação das configurações (constantes) evitando "magic strings/numbers" no código
 from configuracoes import ESTILOS_CSS, CORES_CATEGORIAS, CRITERIOS_AVALIACAO
 
@@ -65,6 +65,17 @@ def aplicar_filtros_laterais(dados_completo):
 
     mascara_periodo = (dados_completo['Data'] >= pd.to_datetime(data_inicio)) & (dados_completo['Data'] <= pd.to_datetime(data_fim))
     dados_filtrados = dados_completo.loc[mascara_periodo]
+
+    # 1.5 Filtro de Contexto (Tipo) - Novo!
+    tipos_disponiveis = sorted(dados_filtrados[COL_TIPO].unique().tolist())
+    tipos_selecionados = st.sidebar.multiselect(
+        "Contexto do Treino",
+        tipos_disponiveis,
+        placeholder="Selecione tipos (Ex: Racha, Específico)..."
+    )
+
+    if tipos_selecionados:
+        dados_filtrados = dados_filtrados[dados_filtrados[COL_TIPO].isin(tipos_selecionados)]
 
     # 2. Filtro de Local
     locais_disponiveis = sorted(dados_filtrados['Local'].unique().tolist())
