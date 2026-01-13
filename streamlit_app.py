@@ -246,6 +246,91 @@ def renderizar_quadrante_ataque(dados):
     
     st.plotly_chart(grafico_dispersao, use_container_width=True)
 
+def renderizar_analise_detalhada_levantamento(dados):
+    """
+    Gráfico de Rosca (Donut) focado na causa dos erros de levantamento.
+    Solicitado pelo usuário para identificar problemas técnicos vs táticos.
+    """
+    st.subheader("Raio-X do Levantamento: Análise de Causas")
+
+    # 1. Filtrar apenas levantamentos
+    # O filtro deve pegar tudo que começa com "Levantamento"
+    dados_lev = dados[dados['Fundamentos'].str.startswith('Levantamento')].copy()
+
+    if dados_lev.empty:
+        st.info("Sem dados de levantamento para análise detalhada.")
+        return
+
+    # 2. Identificar Tipos (Sucessos e Erros)
+    # Vamos classificar tudo: O que for "Bom" é Acerto, o resto é o nome do erro.
+    
+    def classificar_tipo(nome_fundamento):
+        if "Bom" in nome_fundamento:
+            return "✅ Acerto (Bola Boa)"
+        else:
+            # Limpa o nome do erro: "Levantamento - Dois Toques (Erro)" -> "Dois Toques"
+            return nome_fundamento.replace('Levantamento - ', '').replace(' (Erro)', '').capitalize()
+
+    dados_lev['Tipo Detalhado'] = dados_lev['Fundamentos'].apply(classificar_tipo)
+    
+    # 3. Agrupar por Tipo Detalhado
+    resumo_geral = dados_lev.groupby('Tipo Detalhado')['Total Calculado'].sum().reset_index()
+    
+    total_acoes = resumo_geral['Total Calculado'].sum()
+    
+    if total_acoes == 0:
+        st.warning("Sem dados de levantamento.")
+        return
+
+    # 4. Gráfico de Rosca (Donut)
+    # Define cores para garantir que Acerto seja verde
+    grafico_rosca = px.pie(
+        resumo_geral,
+        values='Total Calculado',
+        names='Tipo Detalhado',
+        title=f"Distribuição Total: {int(total_acoes)} Ações",
+        hole=0.4,
+        color='Tipo Detalhado',
+        # Mapa de cores explícito para destacar o acerto e diferenciar erros
+        color_discrete_map={
+            "✅ Acerto (Bola Boa)": "#2ecc71", # Verde
+            "Dois toque": "#e74c3c",           # Vermelho
+            "Condução": "#e67e22",             # Laranja
+            "Bola não permite ataque": "#f1c40f" # Amarelo
+        } 
+    )
+    
+    grafico_rosca.update_traces(textposition='inside', textinfo='percent+label+value')
+    grafico_rosca.update_layout(showlegend=True)
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.plotly_chart(grafico_rosca, use_container_width=True)
+        
+    with col2:
+        st.markdown("#### Insights")
+        
+        # Filtra apenas os erros para dar o insight do vilão
+        apenas_erros = resumo_geral[resumo_geral['Tipo Detalhado'] != "✅ Acerto (Bola Boa)"]
+        
+        if not apenas_erros.empty:
+            maior_erro = apenas_erros.loc[apenas_erros['Total Calculado'].idxmax()]
+            qtd_erro = maior_erro['Total Calculado']
+            pct_erro_relativo = (qtd_erro / apenas_erros['Total Calculado'].sum()) * 100
+            
+            st.write(f"🛑 **Principal Erro:** {maior_erro['Tipo Detalhado']}")
+            st.write(f"Soma **{int(qtd_erro)}** falhas.")
+            
+            tipo_erro_lower = maior_erro['Tipo Detalhado'].lower()
+            if "dois toque" in tipo_erro_lower or "condução" in tipo_erro_lower:
+                st.warning("⚠️ **Técnica:** Cuidado com o contato na bola. Treine o 'toque' isolado.")
+            elif "bola não permite" in tipo_erro_lower:
+                st.warning("⚠️ **Tática:** Melhore o deslocamento para chegar equilibrado.")
+        else:
+            st.success("🌟 Desempenho perfeito! Nenhum erro registrado.")
+
+
 def renderizar_evolucao_temporal(dados):
     """Gráficos de linha mostrando histórico."""
     st.subheader("Histórico de Performance")
@@ -309,6 +394,7 @@ def main():
     
     renderizar_kpis_globais(dados_para_exibicao)
     renderizar_metricas_por_categoria(dados_para_exibicao)
+    renderizar_analise_detalhada_levantamento(dados_para_exibicao) # Nova função adicionada
     renderizar_quadrante_ataque(dados_para_exibicao)
     renderizar_evolucao_temporal(dados_para_exibicao)
     renderizar_tabela_bruta(dados_para_exibicao)

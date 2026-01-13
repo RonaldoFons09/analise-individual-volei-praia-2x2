@@ -5,6 +5,6 @@ __pycache__/
 .DS_Store
 
 # Secrets / Credentials
-# .streamlit/
-# *.toml
-# *.json
+.streamlit/secrets.toml
+*.toml
+*.json
