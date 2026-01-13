@@ -3,7 +3,14 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from dashboard_data import carregar_dados_processados, COL_TIPO
+from dashboard_data import (
+    carregar_dados_processados, 
+    COL_TIPO, 
+    TEXTO_LEVANTAMENTO, 
+    PREFIXO_ATAQUE, 
+    COL_CATEGORIA, 
+    COL_TOTAL_CALCULADO
+)
 # Importação das configurações (constantes) evitando "magic strings/numbers" no código
 from configuracoes import ESTILOS_CSS, CORES_CATEGORIAS, CRITERIOS_AVALIACAO
 
@@ -186,6 +193,81 @@ def renderizar_metricas_por_categoria(dados):
 
     st.markdown("---")
 
+def renderizar_analise_detalhada_causas(dados):
+    """
+    Exibe gráficos de pizza/rosca para identificar causas raiz (distribuição de tipos).
+    Foca em mostrar o 'porquê' dos erros e acertos.
+    """
+    st.subheader("🔎 Raio-X dos Fundamentos (Causas e Detalhes)")
+    
+    col1, col2 = st.columns(2)
+
+    # --- Coluna 1: Levantamento ---
+    with col1:
+        st.markdown(f"##### Detalhamento: {TEXTO_LEVANTAMENTO}")
+        
+        # Filtra dados da categoria Levantamento
+        dados_lev = dados[dados[COL_CATEGORIA] == TEXTO_LEVANTAMENTO].copy()
+        
+        if not dados_lev.empty:
+            # Agrupa por tipo específico (Fundamento) somando o volume
+            resumo_lev = dados_lev.groupby('Fundamentos')[COL_TOTAL_CALCULADO].sum().reset_index()
+            
+            # Limpeza visual dos rótulos para o gráfico
+            # Remove o prefixo "Levantamento - " e o sufixo " (Erro)" para ficar mais limpo
+            resumo_lev['Label'] = resumo_lev['Fundamentos'].str.replace(f'{TEXTO_LEVANTAMENTO} - ', '', regex=False)
+            resumo_lev['Label'] = resumo_lev['Label'].str.replace(' (Erro)', '', regex=False)
+            
+            fig = px.pie(
+                resumo_lev, 
+                names='Label', 
+                values=COL_TOTAL_CALCULADO, 
+                hole=0.4, # Gráfico de Rosca
+                title='Distribuição por Tipo de Ação'
+            )
+            # Melhora a visualização dos dados internos
+            fig.update_traces(textposition='inside', textinfo='percent+label')
+            fig.update_layout(showlegend=False) # Legenda oculta para limpar visual, já tem label dentro
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Insight textual simples
+            maior_tipo = resumo_lev.loc[resumo_lev[COL_TOTAL_CALCULADO].idxmax()]
+            st.caption(f"💡 Seu tipo mais frequente é **{maior_tipo['Label']}** ({int(maior_tipo[COL_TOTAL_CALCULADO])} ações).")
+            
+        else:
+            st.info("Sem dados registrados para Levantamento.")
+
+    # --- Coluna 2: Ataque ---
+    with col2:
+        st.markdown(f"##### Detalhamento: {PREFIXO_ATAQUE}")
+        
+        dados_atk = dados[dados[COL_CATEGORIA] == PREFIXO_ATAQUE].copy()
+        
+        if not dados_atk.empty:
+            resumo_atk = dados_atk.groupby('Fundamentos')[COL_TOTAL_CALCULADO].sum().reset_index()
+            
+            # Limpeza de rótulos
+            resumo_atk['Label'] = resumo_atk['Fundamentos'].str.replace(f'{PREFIXO_ATAQUE} - ', '', regex=False)
+            
+            fig = px.pie(
+                resumo_atk, 
+                names='Label', 
+                values=COL_TOTAL_CALCULADO, 
+                hole=0.4,
+                title='Variações Utilizadas'
+            )
+            fig.update_traces(textposition='inside', textinfo='percent+label')
+            fig.update_layout(showlegend=False)
+            st.plotly_chart(fig, use_container_width=True)
+            
+            maior_atk = resumo_atk.loc[resumo_atk[COL_TOTAL_CALCULADO].idxmax()]
+            st.caption(f"💡 Sua principal arma é **{maior_atk['Label']}**.")
+
+        else:
+            st.info("Sem dados registrados para Ataque.")
+            
+    st.markdown("---")
+
 def renderizar_quadrante_ataque(dados):
     """Gráfico de dispersão para análise tática de ataques."""
     st.subheader("Análise Tática de Ataque (Quadrante Mágico)")
@@ -309,6 +391,7 @@ def main():
     
     renderizar_kpis_globais(dados_para_exibicao)
     renderizar_metricas_por_categoria(dados_para_exibicao)
+    renderizar_analise_detalhada_causas(dados_para_exibicao) # Nova Seção!
     renderizar_quadrante_ataque(dados_para_exibicao)
     renderizar_evolucao_temporal(dados_para_exibicao)
     renderizar_tabela_bruta(dados_para_exibicao)
