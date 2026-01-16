@@ -355,25 +355,9 @@ def renderizar_evolucao_temporal(dados):
     grafico_linhas.update_yaxes(tickformat='.0%')
     st.plotly_chart(grafico_linhas, use_container_width=True)
     
-    # Tabela de Dados (Pivot)
-    st.markdown("##### Visualização Tabular")
-    tabela_cruzada = evolucao_por_categoria.pivot(index='Data', columns='Categoria', values='Eficiencia')
-    st.dataframe(tabela_cruzada.style.format('{:.1%}'), use_container_width=True)
 
-def renderizar_tabela_bruta(dados):
-    """Expander com dados brutos para auditoria."""
-    st.markdown("---")
-    with st.expander("🔍 Explorar Dados Brutos"):
-        colunas_exportar = ['Data', 'Local', 'Fundamentos', 'Quantidade correta', 'Quantidade errada', 'Total Calculado', 'Eficiencia']
-        st.dataframe(
-            dados[colunas_exportar].style.format({
-                'Eficiencia': '{:.1%}',
-                'Quantidade correta': '{:.0f}',
-                'Quantidade errada': '{:.0f}',
-                'Total Calculado': '{:.0f}'
-            }),
-            use_container_width=True
-        )
+
+
 
 # --- Função Principal (Ponto de Entrada) ---
 
@@ -397,7 +381,7 @@ def main():
     renderizar_analise_detalhada_levantamento(dados_para_exibicao) # Nova função adicionada
     renderizar_quadrante_ataque(dados_para_exibicao)
     renderizar_evolucao_temporal(dados_para_exibicao)
-    renderizar_tabela_bruta(dados_para_exibicao)
+
 
 if __name__ == "__main__":
     main()
