@@ -241,8 +241,8 @@ def renderizar_quadrante_ataque(dados):
     
     # Lista de tuplas com configuração das anotações
     # Ajuste de Y para evitar sobreposição (acima de 100% e abaixo de 0%)
-    offset_superior = 1.05
-    offset_inferior = -0.05
+    offset_superior = 1.10
+    offset_inferior = -0.10
     
     config_quadrantes = [
         (max_x, offset_superior, "💎 SEGURANÇA", "#2ecc71"),
