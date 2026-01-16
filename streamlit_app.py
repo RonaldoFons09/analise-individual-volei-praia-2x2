@@ -211,9 +211,9 @@ def renderizar_quadrante_ataque(dados):
         resumo_ataque,
         x='Total Calculado',
         y='Eficiencia',
-        text='Fundamentos',
+        # text='Fundamentos', # Removido para limpar a visualização
         size='Total Calculado',
-        hover_data=['Quantidade correta'],
+        hover_data=['Fundamentos', 'Quantidade correta'],
         color='Eficiencia',
         color_continuous_scale='RdYlGn',
         title="Relação Volume vs Eficiência",
@@ -222,9 +222,9 @@ def renderizar_quadrante_ataque(dados):
 
     grafico_dispersao.update_traces(
         hovertemplate="<br>".join([
-            "Fundamento: %{text}",
+            "Fundamento: %{customdata[0]}",
             "Total Calculado: %{x}",
-            "Quantidade correta: %{customdata[0]}",
+            "Quantidade correta: %{customdata[1]}",
             "Eficiência: %{y:.0%}"
         ]) + "<extra></extra>"
     )
