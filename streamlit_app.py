@@ -331,29 +331,7 @@ def renderizar_analise_detalhada_levantamento(dados):
             st.success("🌟 Desempenho perfeito! Nenhum erro registrado.")
 
 
-def renderizar_evolucao_temporal(dados):
-    """Gráficos de linha mostrando histórico."""
-    st.subheader("Histórico de Performance")
-    
-    # Gráfico 1: Visão Categórica
-    evolucao_por_categoria = dados.groupby(['Data', 'Categoria']).agg({
-        'Quantidade correta': 'sum',
-        'Total Calculado': 'sum'
-    }).reset_index()
-    
-    evolucao_por_categoria['Eficiencia'] = evolucao_por_categoria['Quantidade correta'] / evolucao_por_categoria['Total Calculado']
-    
-    grafico_linhas = px.line(
-        evolucao_por_categoria,
-        x='Data', 
-        y='Eficiencia', 
-        color='Categoria', 
-        markers=True,
-        color_discrete_map=CORES_CATEGORIAS, # Usa constante global
-        title="Evolução Diária por Fundamento"
-    )
-    grafico_linhas.update_yaxes(tickformat='.0%')
-    st.plotly_chart(grafico_linhas, use_container_width=True)
+
     
 
 
@@ -380,7 +358,7 @@ def main():
     renderizar_metricas_por_categoria(dados_para_exibicao)
     renderizar_analise_detalhada_levantamento(dados_para_exibicao) # Nova função adicionada
     renderizar_quadrante_ataque(dados_para_exibicao)
-    renderizar_evolucao_temporal(dados_para_exibicao)
+
 
 
 if __name__ == "__main__":
