@@ -216,7 +216,8 @@ def renderizar_quadrante_ataque(dados):
         hover_data=['Quantidade correta'],
         color='Eficiencia',
         color_continuous_scale='RdYlGn',
-        title="Relação Volume vs Eficiência"
+        title="Relação Volume vs Eficiência",
+        labels={'Eficiencia': 'Eficiência (%)'}
     )
 
     grafico_dispersao.update_traces(
@@ -224,13 +225,16 @@ def renderizar_quadrante_ataque(dados):
             "Fundamento: %{text}",
             "Total Calculado: %{x}",
             "Quantidade correta: %{customdata[0]}",
-            "Eficiencia: %{y:.0%}"
+            "Eficiência: %{y:.0%}"
         ]) + "<extra></extra>"
     )
     
     # Linhas de referência (Quadrantes)
     grafico_dispersao.add_hline(y=meta_eficiencia_percentual, line_dash="dash", line_color="white", annotation_text="Meta")
     grafico_dispersao.add_vline(x=volume_medio, line_dash="dash", line_color="white", annotation_text="Volume Médio")
+
+    # Formatação da barra de cores para porcentagem
+    grafico_dispersao.update_layout(coloraxis_colorbar=dict(tickformat='.0%'))
     
     # Anotações dos quadrantes
     max_x, min_x = resumo_ataque['Total Calculado'].max(), resumo_ataque['Total Calculado'].min()
