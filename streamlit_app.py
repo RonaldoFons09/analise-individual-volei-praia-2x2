@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from dashboard_data import carregar_dados_processados, COL_TIPO
+from dashboard_data import carregar_dados_processados, COL_TIPO, COL_ATLETA
 # Importação das configurações (constantes) evitando "magic strings/numbers" no código
 from configuracoes import ESTILOS_CSS, CORES_CATEGORIAS, CRITERIOS_AVALIACAO
 
@@ -337,7 +337,161 @@ def renderizar_analise_detalhada_levantamento(dados):
 
 
 
+
+def renderizar_area_comparacao(dados):
+    """Área dedicada a comparações entre atletas e períodos."""
+    st.markdown("## ⚔️ Modo Comparação")
+
+    if COL_ATLETA not in dados.columns:
+        st.error("Dados de atletas não encontrados na planilha.")
+        return
+
+    # Garante que a coluna de atleta seja string
+    dados[COL_ATLETA] = dados[COL_ATLETA].astype(str)
+    atletas_disponiveis = sorted(dados[COL_ATLETA].unique().tolist())
+    
+    if not atletas_disponiveis:
+        st.warning("Nenhum atleta encontrado nos dados.")
+        return
+
+    # Abas internas da comparação
+    tab_geral, tab_mensal, tab_diario = st.tabs(["📊 Histórico Completo", "📅 Evolução Mensal", "📆 Evolução Diária"])
+
+    # --- 1. Comparação Histórica Geral ---
+    with tab_geral:
+        st.caption("Comparação de todo o histórico disponível.")
+        c1, c2 = st.columns(2)
+        
+        atleta_a = c1.selectbox("Atleta A", atletas_disponiveis, index=0, key="comp_geral_a")
+        # Tenta selecionar um segundo atleta diferente, se houver
+        idx_b = 1 if len(atletas_disponiveis) > 1 else 0
+        atleta_b = c2.selectbox("Atleta B", atletas_disponiveis, index=idx_b, key="comp_geral_b")
+
+        if atleta_a and atleta_b:
+            dados_a = dados[dados[COL_ATLETA] == atleta_a]
+            dados_b = dados[dados[COL_ATLETA] == atleta_b]
+            
+            # Helper interno de eficiência
+            def calc_eff(df):
+                total = df['Total Calculado'].sum()
+                if total == 0: return 0.0
+                return df['Quantidade correta'].sum() / total
+
+            eff_a = calc_eff(dados_a)
+            eff_b = calc_eff(dados_b)
+            
+            c1.metric(f"Eficiência Global {atleta_a}", f"{eff_a:.1%}")
+            c2.metric(f"Eficiência Global {atleta_b}", f"{eff_b:.1%}", delta=f"{(eff_b - eff_a):.1%}")
+
+            st.markdown("---")
+            st.markdown("#### Confronto por Categoria")
+            
+            def preparar_dados_grafico(df, nome_atleta):
+                grp = df.groupby('Categoria').agg({'Quantidade correta': 'sum', 'Total Calculado': 'sum'}).reset_index()
+                grp['Eficiencia'] = grp['Quantidade correta'] / grp['Total Calculado']
+                grp['Atleta'] = nome_atleta
+                return grp
+
+            df_grafico = pd.concat([
+                preparar_dados_grafico(dados_a, atleta_a),
+                preparar_dados_grafico(dados_b, atleta_b)
+            ])
+            
+            if not df_grafico.empty:
+                fig = px.bar(
+                    df_grafico, x='Categoria', y='Eficiencia', color='Atleta',
+                    barmode='group', text_auto='.0%', title="Eficiência por Fundamento"
+                )
+                fig.update_yaxes(tickformat='.0%')
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("Sem dados suficientes para gráfico.")
+
+    # --- 2. Comparação Mensal ---
+    with tab_mensal:
+        st.caption("Compare o desempenho entre meses diferentes (mesmo atleta ou atletas diferentes).")
+        # Cria coluna auxiliar de Mês/Ano apenas para o selectbox
+        dados['MesAno_Str'] = dados['Data'].dt.strftime('%Y-%m')
+        meses_disponiveis = sorted(dados['MesAno_Str'].unique().tolist(), reverse=True)
+        
+        c1, c2 = st.columns(2)
+        
+        with c1:
+            st.markdown("###### 🟦 Cenário A")
+            atleta_m_a = st.selectbox("Atleta", atletas_disponiveis, key="comp_mes_a_atl")
+            mes_m_a = st.selectbox("Mês", meses_disponiveis, key="comp_mes_a_mes")
+        
+        with c2:
+            st.markdown("###### 🟥 Cenário B")
+            atleta_m_b = st.selectbox("Atleta", atletas_disponiveis, index=idx_b, key="comp_mes_b_atl")
+            # Tenta pegar o mês anterior ou o mesmo se só tiver um
+            idx_mes_b = 1 if len(meses_disponiveis) > 1 else 0
+            mes_m_b = st.selectbox("Mês", meses_disponiveis, index=idx_mes_b, key="comp_mes_b_mes")
+
+        # Filtra e Compara
+        dados_a = dados[(dados[COL_ATLETA] == atleta_m_a) & (dados['MesAno_Str'] == mes_m_a)]
+        dados_b = dados[(dados[COL_ATLETA] == atleta_m_b) & (dados['MesAno_Str'] == mes_m_b)]
+        
+        eff_a = calc_eff(dados_a)
+        eff_b = calc_eff(dados_b)
+        
+        kpi1, kpi2, kpi3 = st.columns(3)
+        kpi1.metric(f"{atleta_m_a} ({mes_m_a})", f"{eff_a:.1%}")
+        kpi2.metric("Diferença (B - A)", f"{(eff_b - eff_a):.1%}")
+        kpi3.metric(f"{atleta_m_b} ({mes_m_b})", f"{eff_b:.1%}")
+
+        if not dados_a.empty or not dados_b.empty:
+            df_grafico_mes = pd.concat([
+                preparar_dados_grafico(dados_a, f"{atleta_m_a} ({mes_m_a})"),
+                preparar_dados_grafico(dados_b, f"{atleta_m_b} ({mes_m_b})")
+            ])
+            fig_mes = px.bar(
+                df_grafico_mes, x='Categoria', y='Eficiencia', color='Atleta',
+                barmode='group', text_auto='.0%'
+            )
+            fig_mes.update_yaxes(tickformat='.0%')
+            st.plotly_chart(fig_mes, use_container_width=True)
+        else:
+            st.warning("Sem dados para os filtros selecionados.")
+
+    # --- 3. Comparação Diária ---
+    with tab_diario:
+        st.caption("Comparação detalhada dia a dia.")
+        datas_disponiveis = sorted(dados['Data'].dt.date.unique().tolist(), reverse=True)
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("###### 🟦 Dia A")
+            atleta_d_a = st.selectbox("Atleta", atletas_disponiveis, key="comp_dia_a_atl")
+            dia_a = st.selectbox("Data", datas_disponiveis, key="comp_dia_a_dt")
+        with c2:
+            st.markdown("###### 🟥 Dia B")
+            atleta_d_b = st.selectbox("Atleta", atletas_disponiveis, index=idx_b, key="comp_dia_b_atl")
+            idx_dia_b = 1 if len(datas_disponiveis) > 1 else 0
+            dia_b = st.selectbox("Data", datas_disponiveis, index=idx_dia_b, key="comp_dia_b_dt")
+
+        dados_a = dados[(dados[COL_ATLETA] == atleta_d_a) & (dados['Data'].dt.date == dia_a)]
+        dados_b = dados[(dados[COL_ATLETA] == atleta_d_b) & (dados['Data'].dt.date == dia_b)]
+
+        eff_a = calc_eff(dados_a)
+        eff_b = calc_eff(dados_b)
+
+        kpi_d1, kpi_d2, kpi_d3 = st.columns(3)
+        kpi_d1.metric(f"Eficiência A", f"{eff_a:.1%}")
+        kpi_d2.metric("Delta", f"{(eff_b - eff_a):.1%}")
+        kpi_d3.metric(f"Eficiência B", f"{eff_b:.1%}")
+
+        st.markdown("#### Detalhes")
+        # Exibe tabelas lado a lado
+        tc1, tc2 = st.columns(2)
+        colunas_ver = ['Fundamentos', 'Quantidade correta', 'Total Calculado']
+        with tc1:
+            st.dataframe(dados_a[colunas_ver], use_container_width=True, hide_index=True)
+        with tc2:
+            st.dataframe(dados_b[colunas_ver], use_container_width=True, hide_index=True)
+
 # --- Função Principal (Ponto de Entrada) ---
+
 
 def main():
     configurar_pagina_inicial()
@@ -351,13 +505,51 @@ def main():
     if dados_carregados.empty:
         st.error("Não foi possível carregar os dados. Verifique a fonte de dados.")
         st.stop()
+
+    # --- Estrutura de Abas Principal ---
+    # Cria abas para separar visão individual de comparação
+    aba_dashboard, aba_comparacao = st.tabs(["📊 Dashboard Individual", "⚔️ Comparação & Análise"])
+
+    # --- ABA 1: Dashboard Individual ---
+    with aba_dashboard:
+        # Filtro de Atleta para o Dashboard Individual
+        try:
+            atletas = sorted(dados_carregados[COL_ATLETA].astype(str).unique().tolist())
+        except KeyError:
+            atletas = ["Eu"]
+            
+        if not atletas:
+             atletas = ["Eu"]
         
-    dados_para_exibicao = aplicar_filtros_laterais(dados_carregados)
-    
-    renderizar_kpis_globais(dados_para_exibicao)
-    renderizar_metricas_por_categoria(dados_para_exibicao)
-    renderizar_analise_detalhada_levantamento(dados_para_exibicao) # Nova função adicionada
-    renderizar_quadrante_ataque(dados_para_exibicao)
+        atleta_principal = "Eu" if "Eu" in atletas else atletas[0]
+        
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("### 👤 Configuração Pessoal")
+        meu_atleta = st.sidebar.selectbox("Visualizar dados de:", atletas, index=atletas.index(atleta_principal) if atleta_principal in atletas else 0)
+        
+        # Filtra dados para o dashboard individual
+        # Se a coluna atleta não exitir (retrocompatibilidade), considera tudo como 'Eu'
+        if COL_ATLETA in dados_carregados.columns:
+            dados_meu_atleta = dados_carregados[dados_carregados[COL_ATLETA] == meu_atleta]
+        else:
+            dados_meu_atleta = dados_carregados
+        
+        # Aplica filtros laterais apenas nos dados do atleta selecionado
+        dados_para_exibicao = aplicar_filtros_laterais(dados_meu_atleta)
+        
+        if dados_para_exibicao.empty:
+             st.info(f"Sem dados para {meu_atleta} com os filtros atuais.")
+        else:
+            renderizar_kpis_globais(dados_para_exibicao)
+            renderizar_metricas_por_categoria(dados_para_exibicao)
+            renderizar_analise_detalhada_levantamento(dados_para_exibicao)
+            renderizar_quadrante_ataque(dados_para_exibicao)
+
+    # --- ABA 2: Comparação ---
+    with aba_comparacao:
+        # Passamos os dados COMPLETOS (sem filtro de sidebar) para a área de comparação ter liberdade
+        renderizar_area_comparacao(dados_carregados)
+
 
 
 

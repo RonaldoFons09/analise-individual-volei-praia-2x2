@@ -11,6 +11,8 @@ NOME_ABA_PLANILHA = 'Página1'
 # Nomes de Colunas (Origem)
 COL_DATA = 'Data'
 COL_LOCAL = 'Local'
+COL_LOCAL = 'Local'
+COL_ATLETA = 'Atleta' # Nova coluna de identificação
 COL_TIPO = 'Tipo' # Nova coluna de contexto
 COL_FUNDAMENTOS = 'Fundamentos'
 COL_QTD_CORRETA = 'Quantidade correta'
@@ -83,6 +85,12 @@ def limpar_e_padronizar_dados(dados: pd.DataFrame) -> pd.DataFrame:
         dados[COL_TIPO] = TIPO_PADRAO
     else:
         dados[COL_TIPO] = dados[COL_TIPO].fillna(TIPO_PADRAO)
+
+    # --- Tratamento de Retrocompatibilidade (Coluna Atleta) ---
+    if COL_ATLETA not in dados.columns:
+        dados[COL_ATLETA] = "Eu" # Valor default se não existir
+    else:
+        dados[COL_ATLETA] = dados[COL_ATLETA].fillna("Desconhecido").astype(str)
     
     # Remove linhas inválidas (sem dados nos campos chave)
     # Adicionado .copy() para evitar SettingWithCopyWarning
