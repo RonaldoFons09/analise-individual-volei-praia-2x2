@@ -218,6 +218,15 @@ def renderizar_quadrante_ataque(dados):
         color_continuous_scale='RdYlGn',
         title="Relação Volume vs Eficiência"
     )
+
+    grafico_dispersao.update_traces(
+        hovertemplate="<br>".join([
+            "Fundamento: %{text}",
+            "Total Calculado: %{x}",
+            "Quantidade correta: %{customdata[0]}",
+            "Eficiencia: %{y:.2f}"
+        ]) + "<extra></extra>"
+    )
     
     # Linhas de referência (Quadrantes)
     grafico_dispersao.add_hline(y=meta_eficiencia_percentual, line_dash="dash", line_color="white", annotation_text="Meta")
