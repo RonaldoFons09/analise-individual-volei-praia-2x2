@@ -240,20 +240,28 @@ def renderizar_quadrante_ataque(dados):
     max_x, min_x = resumo_ataque['Total Calculado'].max(), resumo_ataque['Total Calculado'].min()
     
     # Lista de tuplas com configuração das anotações
+    # Ajuste de Y para evitar sobreposição (acima de 100% e abaixo de 0%)
+    offset_superior = 1.05
+    offset_inferior = -0.05
+    
     config_quadrantes = [
-        (max_x, 1.0, "💎 SEGURANÇA", "#2ecc71"),
-        (min_x, 1.0, "🚀 POTENCIAL", "#3498db"),
-        (max_x, 0.0, "⚠️ RISCO", "#e74c3c"),
-        (min_x, 0.0, "🗑️ DESCARTE", "#7f8c8d")
+        (max_x, offset_superior, "💎 SEGURANÇA", "#2ecc71"),
+        (min_x, offset_superior, "🚀 POTENCIAL", "#3498db"),
+        (max_x, offset_inferior, "⚠️ RISCO", "#e74c3c"),
+        (min_x, offset_inferior, "🗑️ DESCARTE", "#7f8c8d")
     ]
     
     for pos_x, pos_y, rotulo, cor in config_quadrantes:
         grafico_dispersao.add_annotation(x=pos_x, y=pos_y, text=rotulo, showarrow=False, font=dict(color=cor, size=14))
 
+    # Formatação da barra de cores para porcentagem
     grafico_dispersao.update_layout(
+        coloraxis_colorbar=dict(tickformat='.0%'),
         xaxis_title="Volume (Repetições)",
         yaxis_title="Eficiência (%)",
         yaxis_tickformat='.0%',
+        # Expande o eixo Y para caber as anotações deslocadas
+        yaxis=dict(range=[-0.15, 1.15]), 
         height=500
     )
     
