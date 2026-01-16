@@ -224,7 +224,7 @@ def renderizar_quadrante_ataque(dados):
             "Fundamento: %{text}",
             "Total Calculado: %{x}",
             "Quantidade correta: %{customdata[0]}",
-            "Eficiencia: %{y:.2f}"
+            "Eficiencia: %{y:.0%}"
         ]) + "<extra></extra>"
     )
     
